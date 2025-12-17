@@ -16,6 +16,25 @@ usd2rub 25
 ```
 
 ---
+## Install
+
+```bash
+# Install to the system prefix (default: /usr/local)
+make install
+
+# Instal to a user-local directory
+make install PREFIX=$HOME/.local
+```
+
+## Uninstall
+
+```bash
+# Remove files installed to the system prefix
+make uninstall
+
+# Remove files installed to a user-local directory
+make uninstall PREFIX=$HOME/.local
+```
 
 ### License
 
