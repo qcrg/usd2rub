@@ -1,0 +1,63 @@
+#!/bin/env python3
+
+import argparse
+import json
+import operator
+from typing import List
+
+from pydantic import BaseModel
+from pydantic.config import ConfigDict
+from requests import get as GET
+
+VERSION = "0.0.1"
+
+
+ORIGIN = "http://iss.moex.com/iss"
+
+USD_KEY = "CBRF_USD_LAST"
+
+
+class Cbrf(BaseModel):
+	columns: List[str]
+	data: List[List[float | str]]
+
+	model_config = ConfigDict(extra="ignore")
+
+
+class Response(BaseModel):
+	cbrf: Cbrf
+
+	model_config = ConfigDict(extra="ignore")
+
+
+def url(path: str) -> str:
+	return ORIGIN + path
+
+
+def make_parser() -> argparse.ArgumentParser:
+	parser = argparse.ArgumentParser(
+		description="Exchange USD to RUB from Moscow Exchange"
+	)
+	parser.add_argument("amount", nargs="*", default=[1], type=float)
+	parser.add_argument(
+		"-r", "--reverse", action="store_true", help="Exchange from RUB to USD"
+	)
+	parser.add_argument(
+		"-V", "--version", action="version", version=f"usd2rub {VERSION}"
+	)
+	return parser
+
+
+def main():
+	parser = make_parser()
+	args = parser.parse_args()
+	resp = GET(url("/statistics/engines/currency/markets/selt/rates.json"))
+	cbrf = Response(**json.loads(resp.content)).cbrf
+	usd_price = cbrf.data[0][cbrf.columns.index(USD_KEY)]
+	fn = operator.truediv if args.reverse else operator.mul
+	for amount in args.amount:
+		print(f"{fn(amount, usd_price):.2f}")
+
+
+if __name__ == "__main__":
+	main()
