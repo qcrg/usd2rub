@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from pydantic.config import ConfigDict
 from requests import get as GET
 
-VERSION = "0.0.1"
+__version__ = "0.0.1"
 
 
 ORIGIN = "http://iss.moex.com/iss"
@@ -43,7 +43,7 @@ def make_parser() -> argparse.ArgumentParser:
 		"-r", "--reverse", action="store_true", help="Exchange from RUB to USD"
 	)
 	parser.add_argument(
-		"-V", "--version", action="version", version=f"usd2rub {VERSION}"
+		"-V", "--version", action="version", version=f"usd2rub {__version__}"
 	)
 	return parser
 
