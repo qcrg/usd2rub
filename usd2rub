@@ -3,7 +3,11 @@
 import argparse
 import json
 import operator
-from typing import List
+import pickle
+import tempfile
+from datetime import datetime, timedelta
+from os import path
+from typing import Optional
 
 from pydantic import BaseModel
 from pydantic.config import ConfigDict
@@ -16,10 +20,13 @@ ORIGIN = "http://iss.moex.com/iss"
 
 USD_KEY = "CBRF_USD_LAST"
 
+CACHE_FILE_PATH = path.join(tempfile.gettempdir(), f"{__name__}_cache_file")
+CACHE_TTL = timedelta(minutes=5)
+
 
 class Cbrf(BaseModel):
-	columns: List[str]
-	data: List[List[float | str]]
+	columns: list[str]
+	data: list[list[float | str]]
 
 	model_config = ConfigDict(extra="ignore")
 
@@ -48,12 +55,42 @@ def make_parser() -> argparse.ArgumentParser:
 	return parser
 
 
+def fetch_usd_price() -> float:
+	resp = GET(url("/statistics/engines/currency/markets/selt/rates.json"))
+	cbrf = Response(**json.loads(resp.content)).cbrf
+	return float(cbrf.data[0][cbrf.columns.index(USD_KEY)])
+
+
+def load_cached_usd_price() -> Optional[float]:
+	try:
+		mtime = datetime.fromtimestamp(path.getmtime(CACHE_FILE_PATH))
+	except FileNotFoundError:
+		return None
+	elapsed = datetime.now() - mtime
+	if elapsed > CACHE_TTL:
+		return None
+	with open(CACHE_FILE_PATH, "rb") as file:
+		return pickle.load(file)
+
+
+def cache_usd_price(price: float) -> None:
+	with open(CACHE_FILE_PATH, "wb") as file:
+		pickle.dump(price, file)
+
+
+def get_usd_price() -> float:
+	usd_price = load_cached_usd_price()
+	if usd_price is not None:
+		return usd_price
+	usd_price = fetch_usd_price()
+	cache_usd_price(usd_price)
+	return usd_price
+
+
 def main():
 	parser = make_parser()
 	args = parser.parse_args()
-	resp = GET(url("/statistics/engines/currency/markets/selt/rates.json"))
-	cbrf = Response(**json.loads(resp.content)).cbrf
-	usd_price = cbrf.data[0][cbrf.columns.index(USD_KEY)]
+	usd_price = get_usd_price()
 	fn = operator.truediv if args.reverse else operator.mul
 	for amount in args.amount:
 		print(f"{fn(amount, usd_price):.2f}")
